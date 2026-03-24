@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>It's + Clothes Game</title>
+  <style>
+    :root {
+      --bg: #f7f8fc;
+      --text: #1f2937;
+      --card: #ffffff;
+      --border: #d9deea;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .stage {
+      width: min(92vw, 980px);
+      min-height: min(80vh, 700px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .content {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .stack {
+      width: min(96vw, 1200px);
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(24px, 4vw, 56px);
+      flex-wrap: nowrap;
+    }
+
+    .its-side {
+      flex: 0 0 auto;
+      font-size: clamp(3.4rem, 8vw, 7rem);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    
+    
+    .image-wrap {
+      width: min(78vw, 560px);
+      height: min(54vh, 420px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 24px;
+      box-shadow: none;
+      overflow: hidden;
+      padding: 16px;
+      flex: 0 1 auto;
+    }
+
+    @media (max-width: 720px) {
+      .stack {
+        flex-direction: row;
+        gap: 18px;
+      }
+
+      .its-side {
+        font-size: clamp(2.4rem, 7vw, 4rem);
+      }
+
+      .image-wrap {
+        width: min(58vw, 360px);
+        height: min(42vh, 280px);
+        padding: 8px;
+      }
+    }
+    }
+
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .placeholder {
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      border: 3px dashed var(--border);
+      border-radius: 18px;
+      font-size: clamp(1.2rem, 2.8vw, 2rem);
+      font-weight: 700;
+      background: #fff;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <main class="stage" aria-label="Clothes game">
+    <section class="content">
+      <div class="stack">
+        <div class="image-wrap" id="imageWrap" aria-live="polite">
+          <img id="clothesImage" alt="Clothing picture" />
+          <div id="placeholder" class="placeholder" aria-hidden="true">Image not found</div>
+        </div>
+
+        <div class="its-side">It's ...</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const IMG_EXT = 'png';
+    const SHOW_DEBUG_COUNTER = false;
+
+    const imageNames = [
+      'big1', 'big2', 'big3', 'big4',
+      'small1', 'small2', 'small3', 'small4',
+      'new1', 'new2', 'new3', 'new4',
+      'old1', 'old2', 'old3', 'old4'
+    ];
+
+    const imagePaths = imageNames.map(name => `${name}.${IMG_EXT}`);
+    const imageCache = new Map();
+
+    let currentCycle = [];
+    let currentIndex = 0;
+    let lastShownPath = null;
+
+    const clothesImage = document.getElementById('clothesImage');
+    const placeholder = document.getElementById('placeholder');
+    const imageWrap = document.getElementById('imageWrap');
+
+    function shuffle(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function buildNewCycle() {
+      let nextCycle = shuffle(imagePaths);
+
+      if (lastShownPath && nextCycle.length > 1 && nextCycle[0] === lastShownPath) {
+        [nextCycle[0], nextCycle[1]] = [nextCycle[1], nextCycle[0]];
+      }
+
+      currentCycle = nextCycle;
+      currentIndex = 0;
+    }
+
+    function preloadImages(paths) {
+      paths.forEach(path => {
+        const img = new Image();
+        img.onload = () => {
+          imageCache.set(path, { ok: true });
+        };
+        img.onerror = () => {
+          imageCache.set(path, { ok: false });
+        };
+        img.src = path;
+      });
+    }
+
+    function showPlaceholder() {
+      clothesImage.classList.add('hidden');
+      placeholder.style.display = 'flex';
+    }
+
+    function showImage(path) {
+      const cached = imageCache.get(path);
+      const knownBroken = cached && cached.ok === false;
+
+      if (knownBroken) {
+        showPlaceholder();
+        lastShownPath = path;
+        return;
+      }
+
+      placeholder.style.display = 'none';
+      clothesImage.classList.remove('hidden');
+      clothesImage.onerror = () => {
+        imageCache.set(path, { ok: false });
+        showPlaceholder();
+      };
+      clothesImage.onload = () => {
+        imageCache.set(path, { ok: true });
+        placeholder.style.display = 'none';
+        clothesImage.classList.remove('hidden');
+      };
+      clothesImage.src = path;
+      lastShownPath = path;
+    }
+
+    function nextImage() {
+      if (currentIndex >= currentCycle.length) {
+        buildNewCycle();
+      }
+
+      const nextPath = currentCycle[currentIndex];
+      currentIndex += 1;
+      showImage(nextPath);
+    }
+
+    function resetGame() {
+      clothesImage.removeAttribute('src');
+      clothesImage.classList.add('hidden');
+      placeholder.style.display = 'none';
+      buildNewCycle();
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (event.repeat) return;
+
+      if (event.key === 'Escape') {
+        resetGame();
+        return;
+      }
+
+      nextImage();
+    });
+
+    preloadImages(imagePaths);
+    buildNewCycle();
+
+    if (SHOW_DEBUG_COUNTER) {
+      const counter = document.createElement('div');
+      counter.style.position = 'fixed';
+      counter.style.bottom = '10px';
+      counter.style.right = '12px';
+      counter.style.fontSize = '12px';
+      counter.style.opacity = '0.5';
+      document.body.appendChild(counter);
+
+      const originalNextImage = nextImage;
+      nextImage = function () {
+        originalNextImage();
+        counter.textContent = `${currentIndex}/${currentCycle.length}`;
+      };
+    }
+  </script>
+</body>
+</html>
